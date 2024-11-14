@@ -1,0 +1,31 @@
+OrganizationUpdate:
+  Type: update-organization
+  Template: ./organization.yml
+
+BudgetAlarms:
+  Type: update-stacks
+  Template: ./templates/budget-alarms.yml
+  StackName: budget-alarms
+  DefaultOrganizationBinding:
+    AccountsWithTag: budget-alarm-threshold
+  DefaultOrganizationBindingRegion: eu-west-1
+
+GitHubRole:
+  Type: update-stacks
+  Template: ./templates/github-role.yml
+  StackName: github-role
+  DefaultOrganizationBinding:
+    AccountsWithTag: github-actions
+  DefaultOrganizationBindingRegion: eu-west-1
+  Parameters:
+    currentAccount: !GetAtt CurrentAccount.Alias
+
+TerraformPreReqs:
+  Type: update-stacks
+  Template: ./templates/terraform-state-pre-reqs.yml
+  StackName: terraform-pre-reqs
+  DefaultOrganizationBinding:
+    AccountsWithTag: terraform
+  DefaultOrganizationBindingRegion: eu-west-1
+  Parameters:
+    currentAccount: !GetAtt CurrentAccount.Alias

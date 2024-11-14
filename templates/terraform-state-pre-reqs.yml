@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09-OC'
+
+Organization: !Include ../organization.yml
+
+DefaultOrganizationBindingRegion: eu-west-1
+
+Parameters:
+  currentAccount:
+    Type: String
+
+Resources:
+  StateBucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Sub "tf-state-${currentAccount}"
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  LockTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: !Sub "tf-state-${currentAccount}"
+      BillingMode: 'PAY_PER_REQUEST'
+      AttributeDefinitions: 
+        - AttributeName: 'LockID'
+          AttributeType: 'S'
+      KeySchema: 
+        - AttributeName: 'LockID'
+          KeyType: 'HASH'

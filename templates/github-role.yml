@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09-OC'
+
+Organization: !Include ../organization.yml
+
+DefaultOrganizationBindingRegion: eu-west-1
+
+Parameters:
+  currentAccount:
+    Type: String
+
+Resources:
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns: ["arn:aws:iam::aws:policy/AdministratorAccess"]
+      RoleName: "gh-deploy-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRoleWithWebIdentity
+            Principal:
+              Federated: !Ref GitHubOIDC
+            Condition:
+              StringLike:
+                token.actions.githubusercontent.com:aud: "sts.amazonaws.com"
+                token.actions.githubusercontent.com:sub: !Sub repo:dickravison/*
+
+  GitHubOIDC:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ThumbprintList: [6938fd4d98bab03faadb97b34396831e3780aea1, 1c58a3a8518e8759bf075b76b750d4f2df264fcd]
+      ClientIdList:
+        - sts.amazonaws.com

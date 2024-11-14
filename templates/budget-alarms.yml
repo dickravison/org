@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09-OC'
+
+Organization: !Include ../organization.yml
+
+Parameters:
+  resourcePrefix:
+    Type: String
+    Default: dvsn
+  alarmSubscriptionProtocol:
+    Type: String
+    Default: email
+  alarmSubscriptionEndpoint:
+    Type: String
+    Default: !GetAtt AWSAccount.Tags.budget-alarm-threshold-email-recipient
+
+Resources:
+  Budget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub '${resourcePrefix}-budget-${AWSAccount.AccountName}'
+        BudgetLimit:
+          Amount: !GetAtt AWSAccount.Tags.budget-alarm-threshold
+          Unit: USD
+        TimeUnit: MONTHLY
+        BudgetType: COST
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 90
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: !Ref BudgetAlarmTopic
+            - SubscriptionType: EMAIL
+              Address: budget-alarms@dvsn.io
+
+  BudgetAlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${resourcePrefix}-budget-alarm-notification'
+      DisplayName: !Sub
+      - 'Budget Alarm for ${AWSAccount.AccountName} (forecasted threshold greater than ${threshold})'
+      - { threshold: !GetAtt AWSAccount.Tags.budget-alarm-threshold}
+      Subscription:
+        - Protocol: !Ref alarmSubscriptionProtocol
+          Endpoint: !Ref alarmSubscriptionEndpoint
+
+  AlarmTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref BudgetAlarmTopic
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowBudgetPublish
+            Effect: Allow
+            Principal:
+              Service: budgets.amazonaws.com
+            Action: sns:publish
+            Resource: !Ref BudgetAlarmTopic

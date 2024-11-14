@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: '2010-09-09-OC'
+Description: Default template generated for organization
+
+Organization:
+  ManagementAccount:
+    Type: OC::ORG::MasterAccount
+    Properties:
+      AccountName:
+      AccountId: 
+      RootEmail: 
+      Alias: 
+
+  OrganizationRoot:
+    Type: OC::ORG::OrganizationRoot
+    Properties:
+      DefaultOrganizationAccessRoleName: OrganizationAccountAccessRole
+
+### OUs
+  MgmtOU:
+    Type: OC::ORG::OrganizationalUnit
+    Properties:
+      OrganizationalUnitName: mgmt
+      ServiceControlPolicies:
+        - !Ref DenyChangeOfOrgRoleSCP
+        - !Ref RestrictUnusedRegionsSCP
+        - !Ref DenyIAMUserCreation
+        - !Ref RestrictRoot
+      Accounts:
+        - !Ref BackupAccount
+        - !Ref SecurityAccount
+        - !Ref ManagementAccount
+
+  WorkloadOU:
+    Type: OC::ORG::OrganizationalUnit
+    Properties:
+      OrganizationalUnitName: workload
+      ServiceControlPolicies:
+        - !Ref DenyChangeOfOrgRoleSCP
+        - !Ref RestrictUnusedRegionsSCP
+        - !Ref DenyIAMUserCreation
+        - !Ref RestrictRoot
+      Accounts:
+        - !Ref DevAccount
+        - !Ref PrdAccount
+
+  SuspendedOU:
+    Type: OC::ORG::OrganizationalUnit
+    Properties:
+      OrganizationalUnitName: suspended
+      ServiceControlPolicies:
+        - !Ref ReadOnly
+      
+### Accounts
+  BackupAccount:
+    Type: OC::ORG::Account
+    Properties:
+      AccountName: backup
+      RootEmail:
+      Tags:
+        budget-alarm-threshold: 5
+        budget-alarm-threshold-email-recipient: budget-alarms@dvsn.io
+
+  SecurityAccount:
+    Type: OC::ORG::Account
+    Properties:
+      AccountName: security
+      RootEmail:
+      Tags:
+        budget-alarm-threshold: 5
+        budget-alarm-threshold-email-recipient: budget-alarms@dvsn.io
+
+  DevAccount:
+    Type: OC::ORG::Account
+    Properties:
+      AccountName: dev
+      RootEmail:
+      Alias:
+      Tags:
+        budget-alarm-threshold: 5
+        budget-alarm-threshold-email-recipient: budget-alarms@dvsn.io
+        github-actions: enabled
+        terraform: enabled
+
+  PrdAccount:
+    Type: OC::ORG::Account
+    Properties:
+      AccountName: prd
+      RootEmail:
+      Alias:
+      Tags:
+        budget-alarm-threshold: 5
+        budget-alarm-threshold-email-recipient: budget-alarms@dvsn.io
+        github-actions: enabled
+        terraform: enabled
+
+## SCPs
+  DenyChangeOfOrgRoleSCP:
+    Type: OC::ORG::ServiceControlPolicy
+    Properties:
+      PolicyName: DenyChangeOfOrgRole
+      Description: Deny changing the IAM role used for organization access
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyChangeOfOrgRole
+            Effect: Deny
+            Action:
+              - 'iam:Attach*'
+              - 'iam:Create*'
+              - 'iam:Delete*'
+              - 'iam:Detach*'
+              - 'iam:PutRole*'
+              - 'iam:Update*'
+            Resource:
+              - 'arn:aws:iam::*:role/OrganizationAccountAccessRole'
+
+  RestrictUnusedRegionsSCP:
+    Type: OC::ORG::ServiceControlPolicy
+    Properties:
+      PolicyName: RestrictUnusedRegions
+      Description: Restrict Unused regions
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyUnsupportedRegions
+            Effect: Deny
+            NotAction:
+              - 'cloudfront:*'
+              - 'iam:*'
+              - 'route53:*'
+              - 'support:*'
+              - 'budgets:*'
+            Resource: '*'
+            Condition:
+              StringNotEquals:
+                'aws:RequestedRegion':
+                  - eu-west-1
+                  - us-east-1
+
+  DenyIAMUserCreation:
+    Type: OC::ORG::ServiceControlPolicy
+    Properties:
+      PolicyName: DenyIAMUserCreation
+      Description: Deny creation of IAM users or access keys
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyIAMUserCreation
+            Effect: Deny
+            Action:
+              - 'iam:CreateAccessKey'
+              - 'iam:CreateUser'
+            Resource: '*'
+
+  RestrictRoot:
+    Type: OC::ORG::ServiceControlPolicy
+    Properties:
+      PolicyName: RestrictRoot
+      Description: Prevent any logins with the root user
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyRoot
+            Effect: Deny
+            Action: '*'
+            Resource: '*'
+            Condition:
+              StringLike:
+                'aws:PrincipalArn':
+                  - arn:aws:iam::*:root
+
+  ReadOnly:
+    Type: OC::ORG::ServiceControlPolicy
+    Properties:
+      PolicyName: RestrictAllServices
+      Description: Restrict all services
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Deny
+            Effect: Deny
+            Action: '*'
+            Resource: '*'
